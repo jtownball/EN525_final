@@ -2,6 +2,9 @@
 import numpy as np
 import time
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
+from box import Box
+
+TOLERANCE = 0.001
 
 # Connect to CoppeliaSim
 print('Connecting...')
@@ -40,41 +43,28 @@ l1 = np.linalg.norm(o2-o1)
 l2 = np.linalg.norm(o3-o2)
 print(f'l1={l1}, l2={l2}, o1={o1}, o2={o2}, o3={o3}')
 
-# Define a Box class that will be used to create boxes in the simulation
-class Box:
-    def __init__(self, sim, position, size=[0.1, 0.1, 0.1], velocity=[0.1, 0, 0]):
-        self.sim = sim
-        self.size = size
-        self.velocity = np.array(velocity)
-        self.attached = False
-        self.pos = position
+def inverse_kinematics(x, y, l1, l2, elbow_down=True):
+    # Analytical SCARA IK using the paper's formulas.
+    # θ2 = ±2 atan2( sqrt((l1+l2)^2 - r^2), sqrt(r^2 - (l1-l2)^2) )
+    # θ1 = atan2(y, x) - atan2( l2 sin θ2, l1 + l2 cos θ2 )  (elbow down)
+    # θ1 = atan2(y, x) + atan2( l2 sin θ2, l1 + l2 cos θ2 )  (elbow up)
+    r = np.sqrt(x**2 + y**2)
+    if r < abs(l1 - l2) or r > (l1 + l2):
+        raise ValueError(f'Target ({x:.3f}, {y:.3f}) is out of reach for l1={l1:.3f}, l2={l2:.3f}')
 
-        self.handle = sim.createPrimitiveShape(
-            sim.primitiveshape_cuboid,
-            size,
-            0
-        )
+    numerator = np.sqrt(max(0.0, (l1 + l2)**2 - r**2))
+    denominator = np.sqrt(max(0.0, r**2 - (l1 - l2)**2))
+    q2 = 2 * np.arctan2(numerator, denominator)
+    if not elbow_down:
+        q2 = -q2
 
-        sim.setObjectPosition(self.handle, list(self.pos), sim.handle_world)
-        sim.setObjectInt32Param(self.handle, sim.shapeintparam_static, 1)
-        sim.setShapeMass(self.handle, 0.1)
-        sim.setShapeColor(self.handle, None, sim.colorcomponent_ambient_diffuse, [0.65, 0.65, 1])
-    
-    def update(self, dt):
-        if not self.attached:
-            pos = np.array(self.sim.getObjectPosition(self.handle, self.sim.handle_world))
-            new_pos = pos + self.velocity * dt
-            self.sim.setObjectPosition(self.handle, list(new_pos), self.sim.handle_world)
-    
-    def attach(self, tool_handle):
-        self.sim.setObjectParent(self.handle, tool_handle, True)
-        self.attached = True
+    q1 = np.arctan2(y, x)
+    if elbow_down:
+        q1 -= np.arctan2(l2 * np.sin(q2), l1 + l2 * np.cos(q2))
+    else:
+        q1 += np.arctan2(l2 * np.sin(q2), l1 + l2 * np.cos(q2))
 
-    def detach(self):
-        self.sim.setObjectParent(self.handle, -1, True)
-        self.attached = False
-
-# Inverse kinematics is handled by CoppeliaSim's IK solver
+    return q1, q2
 
 # Start the simulation
 print('Starting simulation...')
@@ -85,6 +75,25 @@ dt = sim.getSimulationTimeStep()
 #~~~~~~~~~~~~~~~~~~~~~~~~~
 # TODO SIMULATION
 
+def move_tool_xy_pos(x, y) -> None:
+    q1_target, q2_target = inverse_kinematics(x, y, l1, l2, elbow_down=True)
+    print(f'Target joints: q1={np.degrees(q1_target):.2f}°, q2={np.degrees(q2_target):.2f}°')
+    sim.setObjectFloatParam(q1, sim.jointfloatparam_maxvel, 10)
+    sim.setObjectFloatParam(q2, sim.jointfloatparam_maxvel, 10)
+    sim.setJointTargetPosition(q1, q1_target)
+    sim.setJointTargetPosition(q2, q2_target)
+
+    step_count = 0
+    max_steps = 2000
+    tool_pos = sim.getObjectPosition(tool, sim.handle_world)
+    while np.linalg.norm(np.array(tool_pos) - np.array(box_pos)) > TOLERANCE and step_count < max_steps:
+        sim.step()
+        tool_pos = sim.getObjectPosition(tool, sim.handle_world)
+        step_count += 1
+        
+def move_tool_tip(z) -> None:
+    sim.setJointTargetPosition(q3, z)
+
 boxes = []
 boxes.append(Box(sim, position=[0.5, .5, 0.05]))
 
@@ -94,70 +103,28 @@ sim.setJointTargetPosition(q1, np.radians(-30))
 sim.setJointTargetPosition(q2, np.radians(-20))
 sim.setJointTargetPosition(q3, 0.1)
 
-for i in range(200):
-    # box.update(dt)
-    if i == 50:
-        # Get current box position
-        box_pos = sim.getObjectPosition(box.handle, sim.handle_world)
-        x, y, z = box_pos
-        print(f'Box position at step {i}: {box_pos}')
-        
-        # Compute relative to base
-        x_rel = x - o1[0]
-        y_rel = y - o1[1]
-        z_rel = z - o1[2]
-        print(f'Relative position: {x_rel}, {y_rel}, {z_rel}')
-        
-        # Compute inverse kinematics to reach the box
-        q1_target, q2_target, q3_target = inverse_kinematics(x_rel, y_rel, z_rel, l1, l2)
-        print(f'Target joints: q1={np.degrees(q1_target)}, q2={np.degrees(q2_target)}, q3={q3_target}')
-        sim.setObjectFloatParam(q1, sim.jointfloatparam_maxvel, 10)
-        sim.setObjectFloatParam(q2, sim.jointfloatparam_maxvel, 10)
-        sim.setObjectFloatParam(q3, sim.jointfloatparam_maxvel, 10)
-        sim.setJointTargetPosition(q1, q1_target)
-        sim.setJointTargetPosition(q2, q2_target)
-        sim.setJointTargetPosition(q3, q3_target)
-        
-        tool_pos = sim.getObjectPosition(tool, sim.handle_world)
-        print(f'The tool position is at {tool_pos}')
-        
-        box.attach(tool)
+# Get current box position
+box_pos = sim.getObjectPosition(box.handle, sim.handle_world)
+x, y, z = box_pos
+print(f'Box position at step : {box_pos}')
 
-    # if i == 100:
-    #     sim.setJointTargetPosition(q1, np.radians(30))
-    #     sim.setJointTargetPosition(q2, np.radians(20))
+# Compute relative to base
+x_rel = x - o1[0]
+y_rel = y - o1[1]
+z_rel = z
+print(f'Relative position: {x_rel}, {y_rel}, {z_rel}')
 
-    # if i == 120:
-    #     box.detach()
+move_tool_xy_pos(x_rel,y_rel)
+move_tool_tip(z_rel)
 
-    sim.step()
-    
-    if i == 50:
-        tool_pos = sim.getObjectPosition(tool, sim.handle_world)
-        print(f'Tool position after move at step {i}: {tool_pos}')
+print(f'Tool position after')
+tool_pos = sim.getObjectPosition(tool, sim.handle_world)
+print(f'Distance to box: {np.linalg.norm(np.array(tool_pos) - np.array(box_pos)):.4f}')
+if np.linalg.norm(np.array(tool_pos) - np.array(box_pos)) <= TOLERANCE:
+    box.attach(tool)
+else:
+    print('Warning: tool did not reach the box within max steps; not attaching.')
 
-# u1 = np.radians(-30)
-# u2 = np.radians(-20)
-# u3 = 0.0
-
-# sim.setJointTargetPosition(q1, u1)
-# sim.setJointTargetPosition(q2, u2)
-# sim.setJointTargetPosition(q3, u3)
-
-# for _ in range(60):
-#     sim.step()
-
-# u1 = np.radians(30)
-# u2 = np.radians(-20)
-# u3 = 0.10
-
-# sim.setJointTargetPosition(q1, u1)
-# sim.setJointTargetPosition(q2, u2)
-# sim.setJointTargetPosition(q3, u3)
-
-# for _ in range(60):
-#     sim.step()
-#~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Stop the simulation
 sim.stopSimulation()
