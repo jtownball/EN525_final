@@ -66,15 +66,6 @@ def inverse_kinematics(x, y, l1, l2, elbow_down=True):
 
     return q1, q2
 
-# Start the simulation
-print('Starting simulation...')
-sim.setStepping(True)
-sim.startSimulation()
-dt = sim.getSimulationTimeStep()
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~
-# TODO SIMULATION
-
 def move_tool_xy_pos(x, y) -> None:
     q1_target, q2_target = inverse_kinematics(x, y, l1, l2, elbow_down=True)
     print(f'Target joints: q1={np.degrees(q1_target):.2f}°, q2={np.degrees(q2_target):.2f}°')
@@ -91,17 +82,41 @@ def move_tool_xy_pos(x, y) -> None:
         tool_pos = sim.getObjectPosition(tool, sim.handle_world)
         step_count += 1
         
-def move_tool_tip(z) -> None:
-    sim.setJointTargetPosition(q3, z)
+def move_tool_tip(q3_target, q4_target, tolerance=0.05, max_steps=200) -> None:
+    sim.setObjectFloatParam(q3, sim.jointfloatparam_maxvel, 10)
+    sim.setObjectFloatParam(q4, sim.jointfloatparam_maxvel, 10)
+    sim.setJointTargetPosition(q3, q3_target)
+    sim.setJointTargetPosition(q4, q4_target)
+
+    step_count = 0
+    tool_pos = sim.getObjectPosition(tool, sim.handle_world)
+    while step_count < max_steps and abs(tool_pos[2] - q3_target) > tolerance:
+        sim.step()
+        tool_pos = sim.getObjectPosition(tool, sim.handle_world)
+        step_count += 1
+
+    print(f'Move tool tip to {q3_target:.4f}: took {step_count} steps, z={tool_pos[2]:.4f}')
+
+# Start the simulation
+print('Starting simulation...')
+sim.setStepping(True)
+sim.startSimulation()
+dt = sim.getSimulationTimeStep()
 
 boxes = []
 boxes.append(Box(sim, position=[0.5, .5, 0.05]))
 
 box = boxes[0]
 
-sim.setJointTargetPosition(q1, np.radians(-30))
-sim.setJointTargetPosition(q2, np.radians(-20))
-sim.setJointTargetPosition(q3, 0.1)
+# Get initial q3/q4 joint positions and command them to stay there
+initial_q3 = sim.getJointPosition(q3)
+initial_q4 = sim.getJointPosition(q4)
+print(f'Initial q3={initial_q3:.4f}, q4={initial_q4:.4f}')
+move_tool_tip(initial_q3, initial_q4)
+
+# Step a bit to stabilize the tool at the initial height
+for _ in range(50):
+    sim.step()
 
 # Get current box position
 box_pos = sim.getObjectPosition(box.handle, sim.handle_world)
@@ -115,12 +130,15 @@ z_rel = z
 print(f'Relative position: {x_rel}, {y_rel}, {z_rel}')
 
 move_tool_xy_pos(x_rel,y_rel)
-move_tool_tip(z_rel)
+# move_tool_tip(z_rel)
 
 print(f'Tool position after')
 tool_pos = sim.getObjectPosition(tool, sim.handle_world)
-print(f'Distance to box: {np.linalg.norm(np.array(tool_pos) - np.array(box_pos)):.4f}')
-if np.linalg.norm(np.array(tool_pos) - np.array(box_pos)) <= TOLERANCE:
+distance_to_box = np.linalg.norm(np.array(tool_pos) - np.array(box_pos))
+print(f'Distance to box: {distance_to_box:.4f}')
+if distance_to_box <= TOLERANCE:
+    # Move tool vertical joints to the box height
+    move_tool_tip(z_rel, z_rel)
     box.attach(tool)
 else:
     print('Warning: tool did not reach the box within max steps; not attaching.')
