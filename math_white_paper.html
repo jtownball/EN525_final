@@ -7853,7 +7853,7 @@ a.anchor-link {
 <tr>
 <td style="text-align:center">3</td>
 <td style="text-align:center">0</td>
-<td style="text-align:center">$180 \degree$</td>
+<td style="text-align:center">$180^\circ$</td>
 <td style="text-align:center">$d_3^*$</td>
 <td style="text-align:center">0</td>
 </tr>
@@ -7898,20 +7898,27 @@ The D-H parameters of an RRP robot are relatively simple, with only three joints
  0 &amp; 0 &amp; -1 &amp; d_3 \\
  0 &amp; 0 &amp; 0 &amp; 1 \\
 \end{bmatrix}$$</p>
-<p>$$T_3^0=T_1^0T_2^1T_3^2 = \begin{bmatrix}
-\textbf{R}_3^0 &amp; \textbf{p}_3^0 \\
+<p>$$T_4^3=\begin{bmatrix}
+ \cos \theta_4 &amp; -\sin \theta_4 &amp; 0 &amp; 0\\
+ \sin \theta_4 &amp;  \cos \theta_4 &amp; 0 &amp; 0\\
+ 0 &amp; 0 &amp; 1 &amp; 0 \\
+ 0 &amp; 0 &amp; 0 &amp; 1 \\
+\end{bmatrix}$$</p>
+<p>$$T_4^0=T_1^0T_2^1T_3^2T_4^3 = 
+\begin{bmatrix}
+\textbf{R}_4^0 &amp; \textbf{p}_4^0 \\
 0 &amp; 1 \\
 \end{bmatrix}$$</p>
-<p>$$T_3^0=\begin{bmatrix}
- c_{12} &amp; -s_{12} &amp; 0 &amp; l_1c_1+l_2c_{12} \\
- s_{12} &amp; c_{12} &amp; 0 &amp; l_1s_1+l_2s_{12} \\
+<p>$$T_4^0=\begin{bmatrix}
+ \cos({\theta_1+\theta_2-\theta_4}) &amp; \sin({\theta_1+\theta_2-\theta_4}) &amp; 0 &amp; a_1c_1+a_2c_{12} \\
+ \sin({\theta_1+\theta_2-\theta_4}) &amp; -\cos({\theta_1+\theta_2-\theta_4}) &amp; 0 &amp; a_1s_1+a_2s_{12} \\
  0 &amp; 0 &amp; 1 &amp; d_0+d_3 \\
  0 &amp; 0 &amp; 0 &amp; 1 \\
 \end{bmatrix}$$</p>
 <p>$$\textbf{R}_3^0=\begin{bmatrix}
- c_{12} &amp; s_{12} &amp; 0 \\
- s_{12} &amp; -c_{12} &amp; 0 \\
- 0 &amp; 0 &amp; -1 \\
+ \cos({\theta_1+\theta_2-\theta_4}) &amp; \sin({\theta_1+\theta_2-\theta_4}) &amp; 0 \\
+ \sin({\theta_1+\theta_2-\theta_4}) &amp; -\cos({\theta_1+\theta_2-\theta_4}) &amp; 0 \\
+ 0 &amp; 0 &amp; 1
 \end{bmatrix}$$</p>
 <p>$$\textbf{p}_3^0 = \begin{bmatrix}
 x_E \\
@@ -7924,6 +7931,17 @@ d_0+d_3 \\
 \end{bmatrix}$$</p>
 <p>where $c_{12}$ means $\cos(\theta_1+\theta_2)$, $s_{12}$ means $\sin(\theta_1+\theta_2)$ ,and $[x_E,y_E,z_E]$ is the position of the end-effector E</p>
 <p>Tthe transformation matrix from the origin to the end effector is derived from the D-H parameters using the formula for the three $A_i$ matrices, and multiplying them together.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1426561d">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Forward-Kinematics">Forward Kinematics<a class="anchor-link" href="#Forward-Kinematics">¶</a></h2>
 </div>
 </div>
 </div>
@@ -7954,8 +7972,8 @@ d_0+d_3 \\
 <h2 id="Equations-of-motion">Equations of motion<a class="anchor-link" href="#Equations-of-motion">¶</a></h2><p>For the links, $l_1, l_2$, to find the angular velocities we use $\omega = \dot{\theta}\hat{k}$.
 $$\omega_0 = \dot{\theta_0}\hat{k_0}$$
 $$\omega_1 = \dot{\theta_1}\hat{k_1}$$
-$$\omega_0^2 = \omega_0 + \omega_1 = (\dot{\theta_0} + \dot{\theta_0})\hat{k_0}$$</p>
-<p>Because the MTB robot can be treated at a 2R manipulator, we can directly differentiate the transformation matrices to find the Jacobian by first finding $T_0^2$.</p>
+$$\omega_0^2 = \omega_0 + \omega_1 = (\dot{\theta_0} + \dot{\theta_1})\hat{k_0}$$</p>
+<p>Because the MTB robot can be treated as a 2R manipulator with prismatic joint, we can directly differentiate the transformation matrices to find the Jacobian by first finding $T_0^2$.</p>
 <p>$$
 T_0^2 = T_1^0 T_2^1
 =\begin{bmatrix}
@@ -7968,37 +7986,48 @@ $$</p>
 <p>$$
 \begin{bmatrix}
 X \\
-Y
+Y \\
+Z
 \end{bmatrix}
 =
 \begin{bmatrix}
 l_1 \cos \theta_1 + l_2 \cos(\theta_1 + \theta_2) \\
-l_1 \sin \theta_1 + l_2 \sin(\theta_1 + \theta_2)
+l_1 \sin \theta_1 + l_2 \sin(\theta_1 + \theta_2) \\
+d_0 + d_3
 \end{bmatrix}
 $$
 Differentiating we get
 $$
 \begin{bmatrix}
 \dot X \\
-\dot Y
+\dot Y \\
+\dot Z
 \end{bmatrix}
 =
 \begin{bmatrix}
--,l_{1}\sin\theta_{1} - l_{2}\sin(\theta_{1}+\theta_{2}) &amp; -,l_{2}\sin(\theta_{1}+\theta_{2}) \\
-l_{1}\cos\theta_{1} + l_{2}\cos(\theta_{1}+\theta_{2}) &amp; l_{2}\cos(\theta_{1}+\theta_{2})
+-,l_{1}\sin\theta_{1} - l_{2}\sin(\theta_{1}+\theta_{2}) &amp; -,l_{2}\sin(\theta_{1}+\theta_{2}) &amp; 0 \\
+l_{1}\cos\theta_{1} + l_{2}\cos(\theta_{1}+\theta_{2}) &amp; l_{2}\cos(\theta_{1}+\theta_{2}) &amp; 0 \\
+0 &amp; 0 &amp; 1
+\end{bmatrix}
+\begin{bmatrix}
+\dot \theta_1 \\
+\dot \theta_2 \\
+\dot d_3
 \end{bmatrix}
 $$</p>
 <p>Thus, our Jacobian is,
 $$
 J_D =
 \begin{bmatrix}
-\frac{\partial X}{\partial \theta_1} &amp; \frac{\partial X}{\partial \theta_2} \\
-\frac{\partial Y}{\partial \theta_1} &amp; \frac{\partial Y}{\partial \theta_2}
+\frac{\partial X}{\partial \theta_1} &amp; \frac{\partial X}{\partial \theta_2} &amp; \frac{\partial X}{\partial d_3} \\
+\frac{\partial Y}{\partial \theta_1} &amp; \frac{\partial Y}{\partial \theta_2} &amp; \frac{\partial Y}{\partial d_3} \\
+\frac{\partial Z}{\partial \theta_1} &amp; \frac{\partial Z}{\partial \theta_2} &amp; \frac{\partial Z}{\partial d_3}
 \end{bmatrix}
 =
 \begin{bmatrix}
--,l_1 \sin \theta_1 - l_2 \sin(\theta_1 + \theta_2) &amp; -,l_2 \sin(\theta_1 + \theta_2) \\
-l_1 \cos \theta_1 + l_2 \cos(\theta_1 + \theta_2) &amp; l_2 \cos(\theta_1 + \theta_2)
+-,l_1 \sin \theta_1 - l_2 \sin(\theta_1 + \theta_2) &amp; -,l_2 \sin(\theta_1 + \theta_2) &amp; 0 \\
+l_1 \cos \theta_1 + l_2 \cos(\theta_1 + \theta_2) &amp; l_2 \cos(\theta_1 + \theta_2) &amp; 0 \\
+0 &amp; 0 &amp; 1
 \end{bmatrix}
 $$</p>
 </div>
@@ -8013,8 +8042,9 @@ $$</p>
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <p>This can be put into standard form as:
 $$
-\dot{\mathbf{X}} = J_{D},\dot{\boldsymbol{\theta}}
+\dot{\mathbf{X}} = J_{D} \dot{\boldsymbol{\theta}}
 $$</p>
+<p>where $\dot{\mathbf{X}} = [\dot X, \dot Y, \dot Z]^T$ and $\dot{\boldsymbol{\theta}} = [\dot \theta_1, \dot \theta_2, \dot d_3]^T$.</p>
 </div>
 </div>
 </div>
@@ -8028,26 +8058,27 @@ $$</p>
 <h2 id="Inertia-Tensor">Inertia Tensor<a class="anchor-link" href="#Inertia-Tensor">¶</a></h2><p>$$
 M(\theta) =
 \begin{bmatrix}
-M_{11} &amp; M_{12} \\
-M_{12} &amp; M_{22}
+M_{11} &amp; M_{12} &amp; 0 \\
+M_{12} &amp; M_{22} &amp; 0 \\
+0 &amp; 0 &amp; m_3
 \end{bmatrix}
 $$
-We will assume a homogenous mass for each ROD, $l_1 \text{, and} l_2$ and we place the center of mass (COM) at the midpoint.
+We will assume a homogenous mass for each ROD, $l_1 \text{, and} l_2$ and we place the center of mass (COM) at the midpoint. $m_3$ is the mass of the end-effector or prismatic joint payload.
 $$
-I_{1} = \frac{1}{12},m_{1} l_{1}^{2}, \qquad
-I_{2} = \frac{1}{12},m_{2} l_{2}^{2},
+I_{1} = \frac{1}{12}\,m_{1} l_{1}^{2}, \qquad
+I_{2} = \frac{1}{12}\,m_{2} l_{2}^{2},
 \qquad
 r_{1} = \frac{l_{1}}{2}, \qquad
-r_{2} = \frac{l_{2}}{2}.
+r_{2} = \frac{l_{2}}{2}
 $$</p>
 <p>$$
 \begin{aligned}
 M_{11} &amp;= I_{1} + I_{2}
 + m_{1} r_{1}^{2}
-+ m_{2}\bigl(l_{1}^{2} + r_{2}^{2} + 2,l_{1} r_{2} \cos\theta_{2}\bigr) \\ 
++ m_{2}\bigl(l_{1}^{2} + r_{2}^{2} + 2\,l_{1} r_{2} \cos\theta_{2}\bigr) \\ 
 M_{12} &amp;= I_{2}
 + m_{2}\bigl(r_{2}^{2} + l_{1} r_{2} \cos\theta_{2}\bigr) \\ 
-M_{22} &amp;= I_{2} + m_{2} r_{2}^{2}.
+M_{22} &amp;= I_{2} + m_{2} r_{2}^{2}
 \end{aligned}
 $$</p>
 </div>
@@ -8060,28 +8091,26 @@ $$</p>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="Potential-Energy-and-Christoffel-Symobls">Potential Energy and Christoffel Symobls<a class="anchor-link" href="#Potential-Energy-and-Christoffel-Symobls">¶</a></h2><p>Let gravity be $g$ and potential energy $U(\theta)$, then
+<h2 id="Potential-Energy-and-Christoffel-Symbols">Potential Energy and Christoffel Symbols<a class="anchor-link" href="#Potential-Energy-and-Christoffel-Symbols">¶</a></h2><p>Let gravity be $g$ and potential energy $U(\theta, d_3)$, then
 $$
-U(\theta) = g\bigl[m_{1} r_{1}\sin\theta_{1}
-+ m_{2}\bigl(l_{1}\sin\theta_{1} + r_{2}\sin(\theta_{1}+\theta_{2})\bigr)\bigr]
-$$
-The Christoffel Symbols for the joint space inertia matrix $M(\theta)$ are,
+U(\theta, d_3) = g \left[ m_1 r_1 \sin \theta_1 + m_2 (l_1 \sin \theta_1 + r_2 \sin(\theta_1 + \theta_2)) + m_3 (d_0 + d_3) \right]
+$$</p>
+<p>The Christoffel Symbols for the joint space inertia matrix $M(\theta)$ are,
 $$
 \Gamma_{ijk}
 = \tfrac{1}{2}\biggl(
 \frac{\partial M_{ij}}{\partial\theta_k}
-
-\frac{\partial M_{ik}}{\partial\theta_j}
-\frac{\partial M_{jk}}{\partial\theta_i}
++ \frac{\partial M_{ik}}{\partial\theta_j}
+- \frac{\partial M_{jk}}{\partial\theta_i}
 \biggr)
 $$</p>
-<p>Focusing on the 2R planner portion with $h = m_{2} l_{1} r_{2} \sin\theta_{2}$, the non-zero symbols are,
+<p>Focusing on the 3DOF system with $h = m_{2} l_{1} r_{2} \sin\theta_{2}$, the non-zero symbols are,
 $$
-\Gamma_{112} = \Gamma_{121} = \Gamma_{122} = -h
+\Gamma_{112} = \Gamma_{121} = \Gamma_{122} = -h,
 \qquad
 \Gamma_{211} = +h
 $$</p>
-<p>All other $\Gamma_{ijk} = 0$</p>
+<p>All other $\Gamma_{ijk} = 0$, including those involving the third coordinate.</p>
 </div>
 </div>
 </div>
